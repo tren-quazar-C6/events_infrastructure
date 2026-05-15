@@ -1,0 +1,23 @@
+# Secretos
+.env
+*.env.local
+
+# Volúmenes y datos persistentes
+data/
+mysql-data/
+mongo-data/
+n8n-data/
+mailpit-data/
+
+# Logs
+*.log
+logs/
+
+# Sistema
+.DS_Store
+Thumbs.db
+
+# IDEs
+.vscode/
+.idea/
+*.swp
