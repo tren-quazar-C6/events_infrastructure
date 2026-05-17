@@ -1,0 +1,36 @@
+name: Deploy infrastructure to VPS
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: production
+
+    steps:
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: root
+          key: ${{ secrets.SSH_KEY }}
+          port: 22
+          script: |
+            set -e
+
+            echo "→ Yendo al repo en el VPS"
+            cd /opt/quasar/events_infrastructure
+
+            echo "→ Bajando cambios desde GitHub"
+            git pull origin main
+
+            echo "→ Aplicando cambios al stack (MySQL, Mongo)"
+            docker compose up -d
+
+            echo "→ Estado actual de los contenedores"
+            docker compose ps
+
+            echo "✓ Deploy completado"
