@@ -67,7 +67,7 @@ Síncrona vía REST/JSON. Detalle en [`docs/architecture/communication.md`](docs
 1. **Clonar este repo y los 4 monolitos** como carpetas hermanas:
 
 ```
-   andromeda/
+   events_quasar/
    ├── events_infrastructure/   ← este repo
    ├── events_users/
    ├── events_admin/
