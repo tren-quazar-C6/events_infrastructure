@@ -101,6 +101,29 @@ services:
     networks:
       - quasar_network
 
+    # ---------- events_access (ASP.NET MVC) ----------
+  access:
+    image: ghcr.io/tren-quazar-c6/events_access:latest
+    container_name: quasar_access
+    restart: unless-stopped
+    pull_policy: always
+    environment:
+      ASPNETCORE_ENVIRONMENT: ${ACCESS_ASPNETCORE_ENVIRONMENT:-Production}
+      ASPNETCORE_URLS: http://+:8080
+      ConnectionStrings__MySQL: "Server=mysql;Port=3306;Database=${MYSQL_DATABASE};User=${MYSQL_ACCESS_USER};Password=${MYSQL_ACCESS_PASSWORD};"
+      MongoDB__ConnectionString: "mongodb://${MONGO_USER}:${MONGO_PASSWORD}@mongo:27017/${MONGO_DB}?authSource=${MONGO_DB}"
+      MongoDB__Database: ${MONGO_DB}
+      TZ: ${TZ}
+    ports:
+      - "8103:8080"
+    depends_on:
+      mysql:
+        condition: service_healthy
+      mongo:
+        condition: service_healthy
+    networks:
+      - quasar_network
+
 volumes:
   quasar_mysql_data:
   quasar_mongo_data:
