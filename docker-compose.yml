@@ -78,7 +78,7 @@ services:
       MONGODB_PASSWORD: ${MONGO_PASSWORD}
       TZ: ${TZ}
     ports:
-      - "8100:8080"
+      - "8100:8000"
     depends_on:
       mysql:
         condition: service_healthy
