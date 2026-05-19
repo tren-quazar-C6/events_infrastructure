@@ -78,6 +78,29 @@ services:
     networks:
       - quasar_network
 
+    # ---------- events_tickets (ASP.NET MVC) ----------
+  tickets:
+    image: ghcr.io/tren-quazar-c6/events_tickets:latest
+    container_name: quasar_tickets
+    restart: unless-stopped
+    pull_policy: always
+    environment:
+      ASPNETCORE_ENVIRONMENT: ${TICKETS_ASPNETCORE_ENVIRONMENT:-Production}
+      ASPNETCORE_URLS: http://+:8080
+      ConnectionStrings__MySQL: "Server=mysql;Port=3306;Database=${MYSQL_DATABASE};User=${MYSQL_TICKETS_USER};Password=${MYSQL_TICKETS_PASSWORD};"
+      MongoDB__ConnectionString: "mongodb://${MONGO_USER}:${MONGO_PASSWORD}@mongo:27017/${MONGO_DB}?authSource=${MONGO_DB}"
+      MongoDB__Database: ${MONGO_DB}
+      TZ: ${TZ}
+    ports:
+      - "8102:8080"
+    depends_on:
+      mysql:
+        condition: service_healthy
+      mongo:
+        condition: service_healthy
+    networks:
+      - quasar_network
+
 volumes:
   quasar_mysql_data:
   quasar_mongo_data:
