@@ -161,6 +161,38 @@ services:
     # --------------------------  APIs  --------------------------
     # ============================================================
 
+  api-users:
+    image: ghcr.io/tren-quazar-c6/events_api_users:latest
+    container_name: quasar_api_users
+    restart: unless-stopped
+    pull_policy: always
+    environment:
+      APP_ENV: production
+      APP_KEY: ${USERS_APP_KEY}
+      APP_URL: ${USERS_APP_URL}
+      ASSET_URL: ${USERS_APP_URL}
+      DB_CONNECTION: mysql
+      DB_HOST: mysql
+      DB_PORT: 3306
+      DB_DATABASE: ${MYSQL_DATABASE}
+      DB_USERNAME: ${MYSQL_USERS_USER}
+      DB_PASSWORD: ${MYSQL_USERS_PASSWORD}
+      MONGODB_HOST: mongo
+      MONGODB_PORT: 27017
+      MONGODB_DATABASE: ${MONGO_DB}
+      MONGODB_USERNAME: ${MONGO_USER}
+      MONGODB_PASSWORD: ${MONGO_PASSWORD}
+      TZ: ${TZ}
+    ports:
+      - "8104:8000"
+    depends_on:
+      mysql:
+        condition: service_healthy
+      mongo:
+        condition: service_healthy
+    networks:
+      - quasar_network
+
   # ---------- API admin (ASP.NET Web API) ----------
   api-admin:
     image: ghcr.io/tren-quazar-c6/events_api_admin:latest
