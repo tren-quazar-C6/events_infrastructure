@@ -1,76 +1,96 @@
-# Guía de onboarding para devs
+# ONBOARDING.md
 
-> Esta guía es para los 4 devs del equipo: **Jose, Verónica, Faiber, Luis Miguel**.
-> Te explica cómo configurar tu entorno local para empezar a desarrollar.
+> Guía de onboarding para devs del proyecto **Quasar (Tickify)**.
+> Si eres nuevo en el proyecto o tomaste el rol de Dev 4, este documento es tu punto de partida.
+> Responsable original: Dev 4 — Luis Miguel
+> Última actualización: Mayo 2026
 
 ---
 
 ## Tabla de contenido
 
-- [Filosofía: tu PC ≠ el VPS](#filosofía-tu-pc--el-vps)
-- [Lo que vas a montar en tu PC](#lo-que-vas-a-montar-en-tu-pc)
+- [Contexto del proyecto](#contexto-del-proyecto)
+- [Roles del equipo](#roles-del-equipo)
+- [Regla fundamental: tu PC ≠ el VPS](#regla-fundamental-tu-pc--el-vps)
 - [Pre-requisitos](#pre-requisitos)
-- [Setup paso a paso](#setup-paso-a-paso)
-- [Cómo conectas tu app a las BDs](#cómo-conectas-tu-app-a-las-bds)
+- [Setup local paso a paso](#setup-local-paso-a-paso)
+- [Cómo conecta tu app a las BDs](#cómo-conecta-tu-app-a-las-bds)
 - [Qué usuario MySQL te toca](#qué-usuario-mysql-te-toca)
-- [Migraciones: el contrato compartido del schema](#migraciones-el-contrato-compartido-del-schema)
-- [Reset de la BD local](#reset-de-la-bd-local)
+- [Migraciones y schema compartido](#migraciones-y-schema-compartido)
+- [Cómo deployar tus cambios](#cómo-deployar-tus-cambios)
+- [Cómo crear un release con SemVer](#cómo-crear-un-release-con-semver)
+- [Si tomaste el rol de Dev 4](#si-tomaste-el-rol-de-dev-4)
 - [Preguntas frecuentes](#preguntas-frecuentes)
 
 ---
 
-## Filosofía: tu PC ≠ el VPS
+## Contexto del proyecto
 
-**Cada dev trabaja contra su propia BD local. Nunca contra el VPS.**
-
-El VPS es **producción**: solo recibe cambios vía CI/CD (`git push` → deploy automático). Si todos pegáramos nuestras pruebas locales al VPS, se rompería todo el tiempo.
+Quasar es un sistema de venta de boletas para teatro. Tiene 4 portales MVC server-side y 3 APIs REST, todos corriendo en un VPS compartido.
 
 ```
-TU PC (local)                      VPS (producción)
-─────────────                      ────────────────
-- Tu MySQL en Docker               - MySQL "real"
-- Tu MongoDB en Docker             - MongoDB "real"
-- Tu monolito conectado            - Apps deployadas vía CI/CD
-- Datos de prueba                  - Datos reales (cuando lance el proyecto)
-- Rompe lo que quieras             - INTOCABLE
+tren-quazar-C6/ (organización en GitHub)
+├── events_infrastructure   ← orquestación central (Dev 4)
+├── events_users            ← portal users (Laravel)
+├── events_admin            ← portal admin (ASP.NET MVC)
+├── events_tickets          ← portal tickets (ASP.NET MVC)
+├── events_access           ← portal access (ASP.NET MVC)
+├── events_api_admin        ← API admin (ASP.NET Web API)
+├── events_api_tickets      ← API tickets (ASP.NET Web API)
+└── events_api_access       ← API access (ASP.NET Web API)
 ```
 
-**Resultado:** puedes experimentar, romper, resetear, lo que sea, sin afectar a nadie.
+**Una sola BD MySQL** llamada `events`, compartida por todos.
+**Un MongoDB** llamado `events_logs`, solo para auditoría.
 
 ---
 
-## Lo que vas a montar en tu PC
+## Roles del equipo
 
-Cuando termines este setup tendrás:
+| Dev | Nombre | Responsabilidad |
+|-----|--------|-----------------|
+| Dev 1 | Jose | DB schema + backend `events_users` (Laravel) |
+| Dev 2 | Verónica | Vistas y UI del portal Users (Blade) |
+| Dev 3 | Faiber | `events_tickets` + integración Wompi + n8n |
+| Dev 4 | Luis Miguel | Infraestructura, Docker, Nginx, CI/CD (este repo) |
 
-- `events_infrastructure` clonado → levanta MySQL + MongoDB localmente
-- Tu repo asignado clonado (`events_users`, `events_admin`, `events_tickets` o `events_access`)
-- Tu app conectada a la BD local
-- Todo funcionando en `http://localhost:<tu_puerto>`
+---
+
+## Regla fundamental: tu PC ≠ el VPS
+
+**Nunca trabajes contra la BD del VPS. Siempre usa tu BD local.**
+
+```
+TU PC (desarrollo local)         VPS (producción)
+────────────────────────         ────────────────
+- Tu MySQL en Docker             - MySQL de producción
+- Tu MongoDB en Docker           - MongoDB de producción
+- Tu monolito local              - Apps deployadas automáticamente
+- Datos de prueba                - Datos reales
+- Rompe lo que quieras           - INTOCABLE
+```
+
+El VPS solo recibe cambios vía CI/CD (git push → deploy automático). Nadie hace cambios directamente en el VPS excepto Dev 4 para tareas de infraestructura.
 
 ---
 
 ## Pre-requisitos
 
-Antes de empezar:
+Antes de empezar verifica que tienes instalado:
 
-| Herramienta | Por qué | Cómo verificar |
-|-------------|---------|----------------|
-| **Git** | Clonar repos | `git --version` |
-| **Docker Desktop** | Correr MySQL/Mongo | `docker --version` |
-| **Docker Compose v2** | Orquestar el stack | `docker compose version` |
-| **PHP 8.2+ y Composer** | Solo si tu repo es `events_users` (Laravel) | `php --version` y `composer --version` |
-| **.NET SDK 8.0+** | Solo si tu repo es ASP.NET | `dotnet --version` |
-
-Si alguno falla, instálalo antes de seguir.
+| Herramienta | Verificar con | Para qué |
+|-------------|--------------|---------|
+| Git | `git --version` | Clonar repos |
+| Docker Desktop | `docker --version` | Correr MySQL/MongoDB local |
+| Docker Compose v2 | `docker compose version` | Orquestar el stack |
+| PHP 8.4 + Composer | `php --version` y `composer --version` | Solo para `events_users` y `events_api_users` |
+| .NET SDK 10.0 | `dotnet --version` | Para repos ASP.NET |
 
 ---
 
-## Setup paso a paso
+## Setup local paso a paso
 
-### 1. Crear la carpeta contenedora
-
-Vas a tener varios repos lado a lado. Crea una carpeta para todos:
+### 1. Crear carpeta contenedora
 
 ```bash
 # Windows (PowerShell)
@@ -81,16 +101,14 @@ cd C:\Users\TU_USUARIO\Documents\quasar
 mkdir -p ~/quasar && cd ~/quasar
 ```
 
-### 2. Clonar `events_infrastructure`
-
-Este es el repo que levanta las bases de datos.
+### 2. Clonar events_infrastructure
 
 ```bash
 git clone https://github.com/tren-quazar-C6/events_infrastructure.git
 cd events_infrastructure
 ```
 
-### 3. Crear tu archivo `.env` local
+### 3. Crear tu .env local
 
 ```bash
 # Windows
@@ -100,25 +118,23 @@ copy .env.example .env
 cp .env.example .env
 ```
 
-**Importante:** Para desarrollo local, los valores placeholder del `.env.example` (`cambiame_users`, `cambiame_admin`, etc.) **son suficientes**. No necesitas passwords seguros en local porque tu MySQL solo es accesible desde tu PC.
+Para desarrollo local, los valores placeholder del `.env.example` (`cambiame_*`) son suficientes. **No uses ni pidas los passwords del VPS.**
 
-**No pidas los passwords del VPS.** Esos son solo para producción y los gestiona Dev 4.
-
-### 4. Levantar las BDs
+### 4. Levantar las BDs locales
 
 ```bash
 docker compose up -d
 ```
 
-Espera unos 30 segundos la primera vez (descarga las imágenes).
+La primera vez descarga las imágenes (MySQL ~500MB, MongoDB ~700MB). Espera 2-3 minutos.
 
-### 5. Verificar que arrancó bien
+### 5. Verificar que están healthy
 
 ```bash
 docker compose ps
 ```
 
-Esperado:
+Debes ver:
 
 ```
 NAME            STATUS                  PORTS
@@ -126,38 +142,61 @@ quasar_mongo    Up X seconds (healthy)  0.0.0.0:27017->27017/tcp
 quasar_mysql    Up X seconds (healthy)  0.0.0.0:3306->3306/tcp
 ```
 
-Si ambos están `healthy`, las BDs están listas.
+Si alguno está en `starting` espera 30 segundos más. Si está en `Restarting`, hay un error — ver logs con `docker compose logs mysql`.
 
 ### 6. Clonar tu repo asignado
 
 ```bash
-cd ..   # Volver a ~/quasar
+cd ..   # volver a ~/quasar
 
-# Según tu rol, clona uno de estos:
-git clone https://github.com/tren-quazar-C6/events_users.git      # Jose
-git clone https://github.com/tren-quazar-C6/events_admin.git      # (asignar)
+# Clona según tu rol:
+git clone https://github.com/tren-quazar-C6/events_users.git      # Jose / Verónica
+git clone https://github.com/tren-quazar-C6/events_admin.git      # según asignación
 git clone https://github.com/tren-quazar-C6/events_tickets.git    # Faiber
-git clone https://github.com/tren-quazar-C6/events_access.git     # (asignar)
+git clone https://github.com/tren-quazar-C6/events_access.git     # según asignación
+git clone https://github.com/tren-quazar-C6/events_api_admin.git
+git clone https://github.com/tren-quazar-C6/events_api_tickets.git
+git clone https://github.com/tren-quazar-C6/events_api_access.git
 ```
 
-### 7. Configurar tu monolito
+### 7. Configurar y levantar tu monolito
 
-Cada repo tiene su propia documentación. Sigue el README de tu repo asignado.
+Sigue el README de tu repo específico. En general:
+
+**Para Laravel:**
+```bash
+cd events_users
+composer install
+cp .env.example .env
+php artisan key:generate
+# Editar .env con los datos de conexión a tu MySQL local (ver sección más abajo)
+php artisan migrate
+npm install
+npm run build
+php artisan serve
+```
+
+**Para ASP.NET:**
+```bash
+cd events_admin
+dotnet restore
+# Editar appsettings.Development.json con los datos de conexión
+dotnet ef database update
+dotnet run
+```
 
 ---
 
-## Cómo conectas tu app a las BDs
+## Cómo conecta tu app a las BDs
 
-Tu MySQL y MongoDB locales están expuestos en estos puertos de tu PC:
+Tu MySQL y MongoDB locales están en:
 
-| BD | Host | Puerto | BD por defecto |
-|----|------|--------|----------------|
-| MySQL | `localhost` o `127.0.0.1` | `3306` | `events` |
-| MongoDB | `localhost` o `127.0.0.1` | `27017` | `events_logs` |
+| BD | Host | Puerto | BD |
+|----|------|--------|-----|
+| MySQL | `127.0.0.1` | `3306` | `events` |
+| MongoDB | `127.0.0.1` | `27017` | `events_logs` |
 
-### Ejemplo: Laravel (events_users)
-
-En tu `.env` de Laravel (DENTRO del repo `events_users`):
+### En Laravel (.env de events_users)
 
 ```bash
 DB_CONNECTION=mysql
@@ -165,14 +204,10 @@ DB_HOST=127.0.0.1
 DB_PORT=3306
 DB_DATABASE=events
 DB_USERNAME=users_app
-DB_PASSWORD=cambiame_users
+DB_PASSWORD=cambiame_users   # el valor de tu .env local de infrastructure
 ```
 
-El password es el mismo que está en el `.env` de `events_infrastructure`. **Son los placeholders locales, no los del VPS.**
-
-### Ejemplo: ASP.NET (events_admin, tickets, access)
-
-En tu `appsettings.Development.json`:
+### En ASP.NET (appsettings.Development.json)
 
 ```json
 {
@@ -186,92 +221,234 @@ En tu `appsettings.Development.json`:
 }
 ```
 
+**El password es el que está en el `.env` de `events_infrastructure` en tu PC, no el del VPS.**
+
 ---
 
 ## Qué usuario MySQL te toca
 
-Cada dev usa **su propio usuario MySQL**, no root. Esto es por seguridad: en producción cada app solo tiene permisos sobre lo que necesita.
-
 | Dev | Repo | Usuario MySQL | Password (local) |
 |-----|------|---------------|------------------|
 | Jose | `events_users` | `users_app` | `cambiame_users` |
-| (asignar) | `events_admin` | `admin_app` | `cambiame_admin` |
+| (asignado) | `events_admin` | `admin_app` | `cambiame_admin` |
 | Faiber | `events_tickets` | `tickets_app` | `cambiame_tickets` |
-| (asignar) | `events_access` | `access_app` | `cambiame_access` |
+| (asignado) | `events_access` | `access_app` | `cambiame_access` |
+| (asignado) | `events_api_admin` | `admin_app` | `cambiame_admin` |
+| (asignado) | `events_api_tickets` | `tickets_app` | `cambiame_tickets` |
+| (asignado) | `events_api_access` | `access_app` | `cambiame_access` |
 
-**Todos pueden leer/escribir sobre la BD `events` completa por ahora.** Cuando definamos las tablas finales, los grants se refinarán por tabla.
+Todos los usuarios tienen acceso completo a la BD `events` localmente. En producción los grants se refinarán cuando el schema esté definido.
 
 ---
 
-## Migraciones: el contrato compartido del schema
+## Migraciones y schema compartido
 
-Aunque cada dev tiene su BD local, **todos comparten la misma estructura de tablas**. Eso se logra con migraciones versionadas en Git.
+Aunque cada dev tiene su BD local, todos comparten la misma estructura de tablas. Las migraciones versionadas en Git son el contrato compartido.
 
-### En Laravel (Jose)
+### En Laravel
 
 ```bash
-# Crear una migración nueva
-php artisan make:migration create_events_table
-
-# Aplicar todas las migraciones a tu BD local
+# Aplicar todas las migraciones
 php artisan migrate
 
 # Llenar con datos de prueba
 php artisan db:seed
 
-# Si quieres empezar desde cero
+# Empezar desde cero (⚠️ borra tus datos locales)
 php artisan migrate:fresh --seed
 ```
 
-Cuando creas una migración, **commitea el archivo** en `database/migrations/`. Los demás devs harán `git pull` y corren `php artisan migrate` para aplicarla.
+Cuando crees una migración nueva, commitea el archivo en `database/migrations/`. Los demás hacen `git pull` y corren `php artisan migrate`.
 
 ### En ASP.NET con EF Core
 
 ```bash
-# Crear una migración
-dotnet ef migrations add NombreDescriptivo
-
-# Aplicar a tu BD local
+# Aplicar migraciones
 dotnet ef database update
 
-# Empezar desde cero
+# Crear migración nueva
+dotnet ef migrations add NombreDescriptivo
+
+# Empezar desde cero (⚠️ borra tus datos locales)
 dotnet ef database drop
 dotnet ef database update
 ```
 
-### ⚠️ Coordinación entre devs
+### Coordinación importante
 
-Como **una sola BD MySQL** es compartida por los 4 monolitos, los 4 devs deben coordinar qué tablas crea cada uno para evitar:
+Los 4 monolitos comparten la misma BD `events`. Antes de crear tablas nuevas, revisar `docs/DATABASE_SCHEMA.md` en `events_infrastructure` para evitar conflictos de nombres.
 
-- Conflictos de nombres
-- Migraciones que se pisan
-- Definiciones inconsistentes de una misma tabla
+### Reset de BD local
 
-**Sugerencia:** mantener un documento (`docs/DATABASE_SCHEMA.md` en `events_infrastructure`) con la lista de tablas y quién las posee. Antes de crear una migración, revisar ese documento.
-
----
-
-## Reset de la BD local
-
-Si rompiste algo o quieres empezar de cero:
+Si rompiste algo o quieres empezar desde cero:
 
 ```bash
 cd ~/quasar/events_infrastructure
-docker compose down -v
-docker compose up -d
+docker compose down -v   # ⚠️ borra los datos
+docker compose up -d     # recrea BDs vacías
+
+# Luego en tu monolito:
+php artisan migrate:fresh --seed   # Laravel
+# o
+dotnet ef database update           # ASP.NET
 ```
 
-El `-v` borra los volúmenes (los datos). Los usuarios y la BD `events` se vuelven a crear automáticamente desde los scripts de init.
+---
 
-Después, vuelve a correr las migraciones de tu monolito:
+## Cómo deployar tus cambios
+
+Es simple: **haz push a main**. El CI/CD hace el resto.
 
 ```bash
-# Laravel
-php artisan migrate:fresh --seed
-
-# ASP.NET
-dotnet ef database update
+git add .
+git commit -m "feat: descripción de lo que hiciste"
+git push origin main
 ```
+
+Ve a `https://github.com/tren-quazar-C6/TU_REPO/actions` y verás el workflow corriendo. En 3-5 minutos tus cambios estarán en producción.
+
+### Qué hace el CI/CD automáticamente
+
+1. Descarga tu código en un runner de Ubuntu (cloud de GitHub)
+2. Buildea la imagen Docker
+3. La sube a GHCR con tags `:latest` y `:<sha>`
+4. SSH al VPS
+5. Baja la imagen nueva
+6. Reemplaza el container sin tocar MySQL ni MongoDB
+7. Limpia imágenes viejas
+
+### Si el workflow falla
+
+Ve al run fallido en GitHub Actions, haz click en el job rojo y lee el log. Los errores más comunes están en `CICD.md → Qué pasa si falla el pipeline`.
+
+---
+
+## Cómo crear un release con SemVer
+
+Los pushes a `main` generan imágenes con `:latest` y `:<sha>`. Para generar versiones semánticas visibles en GHCR (`1.0.0`, `1.0`, `1`), usa tags de Git.
+
+```bash
+# Decidir el tipo de cambio:
+# v1.0.0 → primer release
+# v1.1.0 → funcionalidad nueva
+# v1.0.1 → bug fix
+
+# Crear y pushear el tag
+git tag v1.0.0 -m "Release v1.0.0: descripción breve"
+git push origin v1.0.0
+```
+
+El workflow detecta el tag y genera automáticamente los 3 tags semánticos en GHCR.
+
+**Cuándo crear un tag:**
+
+| Tipo | Cuándo | Ejemplo |
+|------|--------|---------|
+| `vX.0.0` | Cambio que rompe compatibilidad | Cambiar estructura de respuesta de la API |
+| `vX.Y.0` | Funcionalidad nueva | Agregar endpoint de búsqueda |
+| `vX.Y.Z` | Bug fix | Arreglar error 500 en login |
+
+---
+
+## Si tomaste el rol de Dev 4
+
+Bienvenido al rol más crítico del proyecto. Aquí tienes todo lo que necesitas saber para continuar.
+
+### Acceso al VPS
+
+```bash
+# Desde Windows (PowerShell)
+ssh -i C:\Users\User\Documents\quasar\secrets\deploy_key root@204.168.211.73
+
+# Desde Mac/Linux
+ssh -i ~/quasar/secrets/deploy_key root@204.168.211.73
+```
+
+La llave `deploy_key` debe estar en la ruta indicada. Si no la tienes, pídela al Dev 4 anterior (Luis Miguel). **Nunca subas la llave privada a Git.**
+
+### Directorio del proyecto en el VPS
+
+```
+/opt/quasar/events_infrastructure/
+```
+
+Ahí están el `docker-compose.yml`, el `.env` real (con passwords de producción), y los scripts de init.
+
+### Tus responsabilidades como Dev 4
+
+1. **Mantener el stack corriendo:** si un container falla, diagnosticar y arreglarlo
+2. **Agregar servicios nuevos:** cuando el equipo cree un nuevo repo, agregar su bloque al compose
+3. **Actualizar el .env del VPS:** cuando alguien agregue una variable nueva a `.env.example`, agregar el valor real al VPS
+4. **Gestionar Nginx:** cuando hay nuevos subdominios, agregar los `server` blocks
+5. **HTTPS:** cuando hay subdominios nuevos, correr `certbot --nginx` para emitir certificados
+6. **Mantener documentación:** si algo cambia, actualizar los archivos en `docs/`
+
+### Comandos de diagnóstico del VPS
+
+```bash
+# Estado de todos los containers
+docker ps --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
+
+# Ver logs de un container
+docker compose logs --tail=50 admin
+docker compose logs -f api-admin   # en vivo
+
+# Uso de disco
+df -h
+docker system df
+
+# Reiniciar un container específico
+cd /opt/quasar/events_infrastructure
+docker compose restart admin
+
+# Aplicar cambios del compose manualmente
+cd /opt/quasar/events_infrastructure
+git pull origin main
+docker compose up -d
+
+# Ver el .env de producción
+cat /opt/quasar/events_infrastructure/.env
+
+# Editar el .env de producción
+nano /opt/quasar/events_infrastructure/.env
+
+# Ver certificados HTTPS
+certbot certificates
+
+# Validar Nginx antes de recargar
+nginx -t
+
+# Recargar Nginx (sin downtime)
+systemctl reload nginx
+```
+
+### Agregar un nuevo monolito o API al stack
+
+**Orden obligatorio:** siempre infrastructure primero, después el repo del monolito.
+
+1. Agregar bloque del servicio al `docker-compose.yml` local
+2. Agregar variables al `.env.example`
+3. Commit + push a `events_infrastructure` → el compose se actualiza en el VPS
+4. (Opcional) Si hay nuevo subdominio: agregar server block en Nginx del VPS, `nginx -t`, `systemctl reload nginx`, `certbot --nginx`
+5. Hacer push del nuevo repo → el pipeline buildea la imagen y deploya
+6. Agregar el valor real de las variables nuevas al `.env` del VPS
+
+### Passwords del VPS
+
+Los passwords de producción están SOLO en el `.env` del VPS:
+
+```bash
+cat /opt/quasar/events_infrastructure/.env
+```
+
+Mantén una copia de respaldo en un gestor de passwords seguro (no en Slack, WhatsApp, ni Google Docs). Si el VPS explota y no tienes el `.env`, pierdes acceso a las BDs.
+
+### Lo que está pendiente de implementar
+
+- DNS para los subdominios de las 3 APIs (el profe los entrega cuando estén)
+- Server blocks de Nginx para las APIs (cuando lleguen los DNS)
+- HTTPS de las APIs vía Certbot (después de Nginx)
+- Variables de `JWT_SECRET`, `WOMPI_*`, `N8N_*`, `SMTP_*` — agregar al `.env` del VPS cuando cada feature se implemente
 
 ---
 
@@ -279,80 +456,102 @@ dotnet ef database update
 
 ### ¿Puedo conectarme a la BD del VPS desde mi PC?
 
-**Técnicamente sí, pero NO lo hagas.**
+Técnicamente sí (el puerto 3306 está expuesto). Pero **no lo hagas**. Es producción. Trabaja contra tu BD local.
 
-El VPS es producción. Si todos conectamos nuestros desarrollos ahí, se rompe constantemente. Trabaja contra tu BD local.
+### ¿Dónde están los passwords del VPS?
 
-### ¿Necesito los passwords del VPS para algo?
+Solo Dev 4 los tiene. Si los necesitas para algo específico, habla con Dev 4 directamente. Nunca se comparten por chat.
 
-**No.** Los passwords del VPS son solo para:
-- El CI/CD que deploya las apps al VPS
-- Dev 4 que administra el servidor
+### ¿Cómo sé si mi deploy llegó al VPS?
 
-Tu app local **nunca** debe conectarse al VPS. Tu CI/CD se encarga de eso por ti.
+Ve a `https://github.com/tren-quazar-C6/TU_REPO/actions`. El workflow en verde con un check ✅ confirma que el deploy fue exitoso.
 
-### ¿Cómo veo lo que está pasando en MySQL/Mongo?
+### ¿Qué pasa si rompí algo en el VPS?
 
-Recomiendo herramientas gráficas:
+Si tus cambios rompieron el container, el container viejo ya no existe. El nuevo está fallando. Solución:
 
-- **MySQL:** DBeaver, MySQL Workbench, TablePlus
-- **MongoDB:** MongoDB Compass
+1. Haz rollback de tu código en Git (`git revert HEAD`)
+2. Push a main
+3. El pipeline deploylará la versión anterior
 
-Conectas con `localhost:3306` o `localhost:27017` y tus credenciales locales.
+### ¿Puedo hacer cambios directamente en el VPS?
 
-### ¿Qué pasa si cambio el .env de events_infrastructure?
+Solo Dev 4 hace cambios en el VPS, y solo para tareas de infraestructura (Nginx, .env, diagnóstico). Nunca edites código de los monolitos directamente en el VPS.
 
-El `.env` de tu PC es solo tuyo (está en `.gitignore`). Cámbialo lo que quieras.
+### ¿Cómo desarrollo sin internet?
 
-Si quieres agregar una variable nueva al stack, agrégala también al `.env.example` y comméntala en el repo para que los demás devs la tengan.
+Las BDs locales son completamente independientes del VPS. Si no hay internet, igual puedes levantar `events_infrastructure` local y trabajar normalmente.
 
-### ¿Cómo despliego mi código al VPS?
+### El CI/CD está fallando, ¿qué hago?
 
-No despliegas tú. **Haces `git push` y el CI/CD lo deploya automáticamente.**
+1. Ve a GitHub Actions del repo y lee el log del job rojo
+2. Si el error está en `build-and-push`: es un problema del Dockerfile o del código
+3. Si el error está en `deploy`: es un problema de infraestructura → habla con Dev 4
+4. Consulta `CICD.md → Qué pasa si falla el pipeline` para errores comunes
 
-Cada repo de monolito tiene su workflow de GitHub Actions configurado por Dev 4.
+### ¿Cómo agrego una variable de entorno nueva?
 
-### Si tengo dudas técnicas sobre infra/Docker/CI/CD, ¿a quién pregunto?
+1. Agregar la variable a `events_infrastructure/.env.example` con un valor placeholder
+2. Commit + push a `events_infrastructure`
+3. Avisar a Dev 4 para que agregue el valor real al `.env` del VPS
+4. Usar la variable en tu código leyéndola del entorno (`Environment.GetEnvironmentVariable(...)` en .NET o `env('VARIABLE')` en Laravel)
 
-A **Dev 4 (Luis Miguel)**. Es el responsable de toda la infraestructura.
+### ¿Cómo funciona el DNS del dominio?
 
-### ¿Y si la BD del VPS está caída?
+El dominio `andrescortes.dev` lo administra el profe (o el dueño del DNS). Los subdominios están configurados como registros A apuntando a `204.168.211.73`. Cuando el profe crea un nuevo subdominio, Dev 4 agrega el server block en Nginx y emite el certificado HTTPS.
 
-Avísale a Dev 4. Mientras tanto, tu desarrollo local no se ve afectado porque trabajas contra tu BD local.
+### ¿Qué es GHCR?
+
+GitHub Container Registry. Es donde se guardan las imágenes Docker del proyecto. Puedes verlas en:
+
+```
+https://github.com/orgs/tren-quazar-C6/packages
+```
+
+Cada repo tiene su propia imagen. Los tags incluyen `:latest`, el SHA del commit, y las versiones semánticas cuando se crea un release.
 
 ---
 
-## Resumen visual del flujo
+## Flujo completo de trabajo
 
 ```
-┌─────────────────────────────────────────────────────────────┐
-│ TU PC                                                        │
-│                                                              │
-│  ┌────────────────────┐      ┌────────────────────┐       │
-│  │ events_infra (local)│      │ tu_repo (local)    │       │
-│  │ - MySQL :3306       │◄─────│ - Tu app           │       │
-│  │ - MongoDB :27017    │      │ - localhost:XXXX   │       │
-│  └────────────────────┘      └────────────────────┘       │
-│                                       │                      │
-└───────────────────────────────────────┼──────────────────────┘
-                                        │ git push
-                                        ▼
-┌─────────────────────────────────────────────────────────────┐
-│ GITHUB                                                       │
-│  Actions ejecuta el workflow                                │
-└──────────────────────────────────┬──────────────────────────┘
-                                   │ SSH al VPS
-                                   ▼
-┌─────────────────────────────────────────────────────────────┐
-│ VPS (producción)                                             │
-│  ┌────────────────────┐      ┌────────────────────┐       │
-│  │ events_infra (VPS)  │      │ tu_repo (VPS)      │       │
-│  │ - MySQL :3306       │◄─────│ - Tu app deployada │       │
-│  │ - MongoDB :27017    │      │ - tu_subdominio    │       │
-│  └────────────────────┘      └────────────────────┘       │
-└─────────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────┐
+│ TU PC                                                           │
+│                                                                 │
+│  ┌────────────────────┐    ┌────────────────────┐               │ 
+│  │ events_infra local  │    │ tu_repo local       │             │
+│  │ docker compose up   │◄───│ Tu app en local     │             │
+│  │ - MySQL :3306       │    │ localhost:XXXX      │             │
+│  │ - MongoDB :27017    │    │                     │             │
+│  └────────────────────┘    └────────────────────┘               │
+│                                      │                          │
+└──────────────────────────────────────┼──────────────────────────┘
+                                       │ git push origin main
+                                       ▼
+┌─────────────────────────────────────────────────────────────────┐
+│ GITHUB ACTIONS                                                  │
+│  Job 1: docker build + push a GHCR                              │
+│  Job 2: SSH al VPS → docker compose pull → up                   │
+└──────────────────────────────┬──────────────────────────────────┘
+                               │ SSH deploy
+                               ▼
+┌─────────────────────────────────────────────────────────────────┐
+│ VPS 204.168.211.73 (producción)                                 │
+│                                                                 │
+│  Nginx ──► quasar.andrescortes.dev      ──► quasar_users:8100   │
+│        ──► admin.quasar.andrescortes.dev──► quasar_admin:8101   │
+│        ──► tickets.quasar...            ──► quasar_tickets:8102 │
+│        ──► access.quasar...             ──► quasar_access:8103  │
+│                                                                 │
+│  quasar_mysql (3306) ◄── todos los containers                   │
+│  quasar_mongo (27017) ◄── todos los containers (logs)           │
+└─────────────────────────────────────────────────────────────────┘
 ```
 
 ---
 
-**Si tienes dudas, pregunta. Mejor preguntar 5 veces que romper algo en producción.**
+**Si tienes dudas, pregunta antes de hacer algo en el VPS.**
+**El VPS es compartido con otros equipos del curso.**
+
+Responsable de esta documentación: Dev 4 — Luis Miguel  
+Organización GitHub: `tren-quazar-C6`
