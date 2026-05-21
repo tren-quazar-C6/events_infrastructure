@@ -55,7 +55,18 @@ services:
       timeout: 5s
       retries: 10
 
-    # ---------- events_users (Laravel PWA) ----------
+  # ---------- Mailpit (SMTP trap para desarrollo local) ----------
+  mailpit:
+    image: axllent/mailpit
+    container_name: quasar_mailpit
+    restart: unless-stopped
+    ports:
+      - "1025:1025"   # SMTP — Laravel apunta aquí
+      - "8025:8025"   # UI web — http://localhost:8025
+    networks:
+      - quasar_network
+
+  # ---------- events_users (Laravel PWA) ----------
   users:
     image: ghcr.io/tren-quazar-c6/events_users:latest
     container_name: quasar_users
@@ -88,7 +99,7 @@ services:
     networks:
       - quasar_network
 
-    # ---------- events_admin (ASP.NET MVC) ----------
+  # ---------- events_admin (ASP.NET MVC) ----------
   admin:
     image: ghcr.io/tren-quazar-c6/events_admin:latest
     container_name: quasar_admin
@@ -111,7 +122,7 @@ services:
     networks:
       - quasar_network
 
-    # ---------- events_tickets (ASP.NET MVC) ----------
+  # ---------- events_tickets (ASP.NET MVC) ----------
   tickets:
     image: ghcr.io/tren-quazar-c6/events_tickets:latest
     container_name: quasar_tickets
