@@ -42,6 +42,12 @@ GRANT SELECT, INSERT, UPDATE, DELETE ON ${MYSQL_DATABASE}.* TO '${MYSQL_TICKETS_
 CREATE USER '${MYSQL_ACCESS_USER}'@'%' IDENTIFIED BY '${MYSQL_ACCESS_PASSWORD}';
 GRANT SELECT, INSERT, UPDATE, DELETE ON ${MYSQL_DATABASE}.* TO '${MYSQL_ACCESS_USER}'@'%';
 
+-- ----------------------------------------------------------------------------
+-- API (ASP.NET) — API única
+-- ----------------------------------------------------------------------------
+CREATE USER '${MYSQL_API_USER}'@'%' IDENTIFIED BY '${MYSQL_API_PASSWORD}';
+GRANT SELECT, INSERT, UPDATE, DELETE ON ${MYSQL_DATABASE}.* TO '${MYSQL_API_USER}'@'%';
+
 FLUSH PRIVILEGES;
 
 EOF
