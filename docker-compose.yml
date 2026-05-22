@@ -230,29 +230,6 @@ services:
     networks:
       - quasar_network
 
-  # ---------- API admin (ASP.NET Web API) ----------
-  api-admin:
-    image: ghcr.io/tren-quazar-c6/events_api_admin:latest
-    container_name: quasar_api_admin
-    restart: unless-stopped
-    pull_policy: always
-    environment:
-      ASPNETCORE_ENVIRONMENT: ${API_ADMIN_ASPNETCORE_ENVIRONMENT:-Production}
-      ASPNETCORE_URLS: http://+:8080
-      ConnectionStrings__MySQL: "Server=mysql;Port=3306;Database=${MYSQL_DATABASE};User=${MYSQL_ADMIN_USER};Password=${MYSQL_ADMIN_PASSWORD};"
-      MongoDB__ConnectionString: "mongodb://${MONGO_USER}:${MONGO_PASSWORD}@mongo:27017/${MONGO_DB}?authSource=${MONGO_DB}"
-      MongoDB__Database: ${MONGO_DB}
-      TZ: ${TZ}
-    ports:
-      - "8105:8080"
-    depends_on:
-      mysql:
-        condition: service_healthy
-      mongo:
-        condition: service_healthy
-    networks:
-      - quasar_network
-
   # ---------- API tickets (ASP.NET Web API) ----------
   api-tickets:
     image: ghcr.io/tren-quazar-c6/events_api_tickets:latest
